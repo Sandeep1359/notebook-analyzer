@@ -1,0 +1,318 @@
+[CODE CELL]
+import pandas as pd  
+import numpy as np
+import matplotlib.pyplot as plt  
+import seaborn as sns  
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+[CODE CELL]
+# Load dataset  
+df = pd.read_csv('data.csv')  
+df
+
+[CODE CELL]
+df.head()
+
+[CODE CELL]
+df.describe()
+
+[CODE CELL]
+df.duplicated().sum()
+
+[CODE CELL]
+df.isnull().sum()
+
+[CODE CELL]
+df.info()
+
+[CODE CELL]
+# Visualize the distribution of the target variable 'SalePrice'
+plt.figure(figsize=(10,6))
+sns.histplot(df['SalePrice'], kde=True)
+plt.title('Distribution of Sale Prices')
+plt.xlabel('Sale Price')
+plt.ylabel('Frequency')
+plt.show()
+
+[CODE CELL]
+# Visualizing relationships between SalePrice and numeric features  
+numeric_features = df.select_dtypes(include=['int64', 'float64']).columns
+
+[CODE CELL]
+plt.figure(figsize=(18, 18))  
+n_features = len(numeric_features)  
+n_cols = 6  # Number of columns for subplots  
+n_rows = (n_features // n_cols) + 1  # Calculate rows needed  
+
+for i, feature in enumerate(numeric_features):  
+    plt.subplot(n_rows, n_cols, i + 1)  
+    sns.scatterplot(data=df, x=feature, y='SalePrice', alpha=0.6)  
+    plt.title(feature)  
+
+plt.tight_layout()  # Adjust layout to prevent overlap  
+plt.show()
+
+[CODE CELL]
+# Calculate the correlation matrix for numerical features only  
+corr_matrix = df[numeric_features].corr()  
+
+# Plot the correlation matrix  
+plt.figure(figsize=(12, 10))  
+sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', square=True)  
+plt.title('Correlation Matrix')  
+plt.show()
+
+[CODE CELL]
+# Example: Count plot for a significant categorical feature  
+plt.figure(figsize=(12, 6))  
+sns.countplot(data=df, x='Neighborhood', order=df['Neighborhood'].value_counts().index)  
+plt.xticks(rotation=90)  
+plt.title('Count of Houses by Neighborhood')  
+plt.show()
+
+[CODE CELL]
+# Analyze the impact of a categorical feature (e.g., Neighborhood) on SalePrice  
+plt.figure(figsize=(15, 7))  
+sns.boxplot(x='Neighborhood', y='SalePrice', data=df)  
+plt.xticks(rotation=90)  
+plt.title('Sale Price by Neighborhood')  
+plt.show()
+
+[CODE CELL]
+# Scatter plot of Lot Area vs. Sale Price, colored by Neighborhood  
+plt.figure(figsize=(12, 6))  
+sns.scatterplot(data=df, x='LotArea', y='SalePrice', hue='Neighborhood', alpha=0.6)  
+plt.title('Lot Area vs. Sale Price by Neighborhood')  
+plt.show()
+
+[CODE CELL]
+missing_values = df.isnull().sum().sort_values(ascending=False)  
+missing_percentage = (missing_values / len(df)) * 100  
+missing_info = pd.DataFrame({'Missing Values': missing_values, 'Percentage': missing_percentage})  
+print(missing_info[missing_info['Missing Values'] > 0])
+
+[CODE CELL]
+df.fillna(method='ffill', inplace=True)
+
+[CODE CELL]
+# Data Visualization
+plt.figure(figsize=(10, 6))
+sns.histplot(df['SalePrice'], kde=True)
+plt.title('Distribution of House Prices')
+plt.show()
+
+[CODE CELL]
+# Correlation Heatmap
+plt.figure(figsize=(12, 8))
+# Convert non-numeric columns to numeric using encoding or exclude them from correlation
+numeric_data = df.select_dtypes(include=['number'])
+sns.heatmap(numeric_data.corr(), annot=True, cmap='coolwarm')
+plt.title('Correlation Heatmap')
+plt.show()
+
+[CODE CELL]
+# Define features and target
+X = df.drop('SalePrice', axis=1)
+y = df['SalePrice']
+
+[CODE CELL]
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+[CODE CELL]
+# Identify categorical and numerical features
+categorical_features = X.select_dtypes(include=['object']).columns
+numerical_features = X.select_dtypes(include=['number']).columns
+
+[CODE CELL]
+# Preprocessing pipeline
+numeric_transformer = StandardScaler()
+categorical_transformer = OneHotEncoder(handle_unknown='ignore')
+
+[CODE CELL]
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numeric_transformer, numerical_features),
+        ('cat', categorical_transformer, categorical_features)
+    ]
+)
+
+[CODE CELL]
+# Modeling pipeline
+model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', RandomForestRegressor(random_state=42))
+])
+
+[CODE CELL]
+# Train the model
+model.fit(X_train, y_train)
+
+[CODE CELL]
+# Evaluate the model
+y_pred = model.predict(X_test)
+print(f'RMSE: {np.sqrt(mean_squared_error(y_test, y_pred))}')
+print(f'MAE: {mean_absolute_error(y_test, y_pred)}')
+print(f'R^2: {r2_score(y_test, y_pred)}')
+
+[CODE CELL]
+from sklearn.model_selection import RandomizedSearchCV
+
+# Define the parameter grid for RandomForestRegressor
+param_dist = {
+    'regressor__n_estimators': [50, 100, 200],
+    'regressor__max_depth': [10, 20, None],
+    'regressor__min_samples_split': [2, 5, 10],
+    'regressor__min_samples_leaf': [1, 2, 4]
+}
+
+# Create RandomizedSearchCV object
+search = RandomizedSearchCV(model, param_dist, n_iter=10, cv=5, scoring='neg_mean_squared_error', n_jobs=-1, random_state=42)
+search.fit(X_train, y_train)
+
+# Best parameters and best model
+print(f"Best Parameters: {search.best_params_}")
+best_model = search.best_estimator_
+
+# Evaluate the best model
+y_pred = best_model.predict(X_test)
+print(f'RMSE: {np.sqrt(mean_squared_error(y_test, y_pred))}')
+print(f'MAE: {mean_absolute_error(y_test, y_pred)}')
+print(f'R^2: {r2_score(y_test, y_pred)}')
+
+[MARKDOWN CELL]
+## LINEAR REGRESSION
+
+[CODE CELL]
+# Modeling pipeline
+model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', LinearRegression())
+])
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Evaluate the model
+y_pred = model.predict(X_test)
+print(f'RMSE: {np.sqrt(mean_squared_error(y_test, y_pred))}')
+print(f'MAE: {mean_absolute_error(y_test, y_pred)}')
+print(f'R^2: {r2_score(y_test, y_pred)}')
+
+[MARKDOWN CELL]
+## DECISION TREE
+
+[CODE CELL]
+# Modeling pipeline
+from sklearn.tree import DecisionTreeRegressor
+model = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('regressor', DecisionTreeRegressor(random_state=42))
+])
+
+# Train the model
+model.fit(X_train, y_train)
+
+# Evaluate the model
+y_pred = model.predict(X_test)
+print(f'RMSE: {np.sqrt(mean_squared_error(y_test, y_pred))}')
+print(f'MAE: {mean_absolute_error(y_test, y_pred)}')
+print(f'R^2: {r2_score(y_test, y_pred)}')
+
+[MARKDOWN CELL]
+## FACTORS AFFECTING SALES WITH OTHER FEATURES
+
+[CODE CELL]
+# Affordable Areas
+average_prices = df.groupby('Neighborhood')['SalePrice'].mean().sort_values()
+print("Affordable Areas:")
+print(average_prices.head())
+
+# High Growth Potential Areas
+price_growth = df.groupby('Neighborhood')['SalePrice'].apply(lambda x: x.pct_change().mean()).sort_values(ascending=False)
+print("High Growth Potential Areas:")
+print(price_growth.head())
+
+# Recommendations based on budget
+budget = 500000  # Example budget
+affordable_houses = df[df['SalePrice'] <= budget]
+print("Houses within budget:")
+print(affordable_houses)
+
+[CODE CELL]
+# Analyze specific feature relationships with price
+for features in df:
+    data=df.copy()
+    data.groupby(features)['SalePrice'].median().plot.bar()
+    plt.title(feature)
+    plt.show()
+
+[CODE CELL]
+discrete_feature=[feature for feature in df if len (df[feature].unique())<25 and feature]
+print('Discrete variable counts:{}'.format(len(discrete_feature)))
+
+[CODE CELL]
+discrete_feature
+
+[CODE CELL]
+for feature in discrete_feature:
+    data=df.copy()
+    data.groupby(feature)['SalePrice'].median().plot.bar()
+    plt.title(feature)
+    plt.show()
+
+[MARKDOWN CELL]
+## Suggestions for customers to purchase a house based on location, price, and needs.
+
+[CODE CELL]
+# Group by area to compute average house prices
+average_prices = df.groupby('Neighborhood')['SalePrice'].mean().sort_values()
+print("Average Prices by Area:")
+print(average_prices)
+
+# Display the most affordable areas
+print("\nMost Affordable Areas:")
+print(average_prices.head())
+
+# Identify high growth potential areas (based on price change trends)
+price_growth = df.groupby('Neighborhood')['SalePrice'].apply(lambda x: x.pct_change().mean()).sort_values(ascending=False)
+print("\nHigh Growth Potential Areas:")
+print(price_growth.head())
+
+# Visualize average prices by area
+plt.figure(figsize=(12, 6))
+average_prices.plot(kind='bar', color='skyblue')
+plt.title('Average House Prices by Area')
+plt.ylabel('Average Price')
+plt.xlabel('Area')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
