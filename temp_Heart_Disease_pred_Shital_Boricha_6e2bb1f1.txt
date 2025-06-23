@@ -1,0 +1,1030 @@
+[MARKDOWN CELL]
+   # PROJECT ID :  "PRCP-1016-Heart Disease Pred"
+# Project Team ID : " PTID-CDS-FEB-25-2476"  
+
+
+[MARKDOWN CELL]
+Our goal is to predict the binary class heart_disease_present, which represents whether or not a patient has heart disease:
+
+**0 represents no heart disease present**  
+**1 represents heart disease present**
+
+[MARKDOWN CELL]
+### Dataset
+
+There are 14 columns in the dataset, where the patient_id column is a unique and random identifier. The remaining 13 features are described in the section below.
+
+* **slope_of_peak_exercise_st_segment** (type: int): the slope of the peak exercise ST segment, an electrocardiography read out indicating quality of blood flow to the heart
+* **thal** (type: categorical): results of thallium stress test measuring blood flow to the heart, with possible values normal, fixed_defect, reversible_defect
+* **resting_blood_pressure** (type: int): resting blood pressure
+* **chest_pain_type** (type: int): chest pain type (4 values)
+* **num_major_vessels** (type: int): number of major vessels (0-3) colored by flourosopy
+* **fasting_blood_sugar_gt_120_mg_per_dl** (type: binary): fasting blood sugar > 120 mg/dl
+* **resting_ekg_results** (type: int): resting electrocardiographic results (values 0,1,2)
+* **serum_cholesterol_mg_per_dl** (type: int): serum cholestoral in mg/dl
+* **oldpeak_eq_st_depression** (type: float): oldpeak = ST depression induced by exercise relative to rest, a measure of abnormality in electrocardiograms
+* **sex** (type: binary): 0: female, 1: male
+* **age** (type: int): age in years
+* **max_heart_rate_achieved** (type: int): maximum heart rate achieved (beats per minute)
+* **exercise_induced_angina** (type: binary): exercise-induced chest pain (0: False, 1: True)
+
+[MARKDOWN CELL]
+### Feature data example
+
+Here's an example of one of the rows in the dataset so that you can see the kinds of values you might expect in the dataset. Some are binary, some are integers, some are floats, and some are categorical. There are no missing values.
+
+|field |value |
+|------|------|
+|slope_of_peak_exercise_st_segment |2 |
+|thal | normal |
+|resting_blood_pressure | 125 |
+|chest_pain_type | 3 |
+|num_major_vessels | 0 |
+|fasting_blood_sugar_gt_120_mg_per_dl| 1 |
+|resting_ekg_results | 2 |
+|serum_cholesterol_mg_per_dl | 245 |
+|oldpeak_eq_st_depression | 2.4 |
+|sex | 1 |
+|age | 51 |
+|max_heart_rate_achieved | 166 |
+|exercise_induced_angina | 0 |
+
+[MARKDOWN CELL]
+#### Import the Libraries
+
+[CODE CELL]
+from pandas import set_option
+%matplotlib inline
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+# for preprocessing the data
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import log_loss
+# the model
+from sklearn.linear_model import LogisticRegression
+
+# for combining the preprocess with model training
+from sklearn.pipeline import Pipeline
+
+# for optimizing parameters of the pipeline
+from sklearn.model_selection import GridSearchCV
+
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+[MARKDOWN CELL]
+#### Load the test and training dataset
+
+[CODE CELL]
+train = pd.read_csv('train_values.csv',index_col='patient_id')
+
+[CODE CELL]
+train_labels = pd.read_csv('train_labels.csv',index_col='patient_id')
+
+[CODE CELL]
+train.shape
+
+[CODE CELL]
+test = pd.read_csv('test_values.csv', index_col='patient_id')
+
+[MARKDOWN CELL]
+#### Dimensions of the Data
+
+[CODE CELL]
+train.head()
+
+[CODE CELL]
+train.shape
+
+[MARKDOWN CELL]
+#### Data Type For Each Attribute
+
+[CODE CELL]
+train.dtypes
+
+[CODE CELL]
+train.describe()
+
+[CODE CELL]
+train_labels.head()
+
+[CODE CELL]
+test.head()
+
+[CODE CELL]
+train_labels.shape
+
+[CODE CELL]
+test.shape
+
+[MARKDOWN CELL]
+#### Class Distribution
+
+[CODE CELL]
+train_labels.groupby('heart_disease_present').size()
+
+[CODE CELL]
+train_labels.heart_disease_present.value_counts().plot.bar(title='Number with Heart Disease')
+
+[CODE CELL]
+selected_features = ['age',
+                     'sex',
+                     'max_heart_rate_achieved',
+                     'resting_blood_pressure']
+#train_values_subset = train[selected_features]
+
+[CODE CELL]
+sns.pairplot(train.join(train_labels),
+             hue='heart_disease_present',
+             vars=selected_features)
+
+[MARKDOWN CELL]
+#### Correlations Between Attributes
+
+[CODE CELL]
+print(train.dtypes)
+
+
+[CODE CELL]
+from sklearn.preprocessing import LabelEncoder
+
+# Apply label encoding to 'thal'
+label_encoder = LabelEncoder()
+train["thal"] = label_encoder.fit_transform(train["thal"])
+
+
+[CODE CELL]
+
+import pandas as pd
+
+pd.set_option('display.width', 100)    # Sets the max width of display output
+pd.set_option('display.precision', 3)
+correlations = train.corr(method='pearson')
+correlations
+
+[CODE CELL]
+sns.heatmap(train.corr(method='pearson'),annot=True, cmap='terrain', linewidths=0.1)
+fig=plt.gcf()
+fig.set_size_inches(8,6)
+plt.show()
+
+[CODE CELL]
+sns.pairplot(train)
+plt.show()
+
+[MARKDOWN CELL]
+#### Skew of Univariate Distributions
+
+[CODE CELL]
+train.skew()
+
+[MARKDOWN CELL]
+#### Check for missing values
+
+[CODE CELL]
+train.isnull().sum()
+
+
+[CODE CELL]
+test.isnull().sum()
+
+[MARKDOWN CELL]
+#### Baseline Score
+
+[MARKDOWN CELL]
+#### One hot Encoding
+
+[CODE CELL]
+one_hot_encoded_training_predictors = pd.get_dummies(train)
+one_hot_encoded_test_predictors = pd.get_dummies(test)
+train,test = one_hot_encoded_training_predictors.align(one_hot_encoded_test_predictors,
+                                                                    join='left',
+                                                                    axis=1)
+
+[MARKDOWN CELL]
+#### Feature Importance
+
+[CODE CELL]
+from xgboost import plot_importance
+model = xgb.XGBClassifier()
+model.fit(train, train_labels.heart_disease_present)
+# plot feature importance
+plot_importance(model)
+plt.show()
+
+[MARKDOWN CELL]
+#### Feature Selection
+
+[CODE CELL]
+from numpy import sort
+from sklearn.feature_selection import SelectFromModel
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import xgboost as xgb
+
+# Split dataset
+X_train, X_test, y_train, y_test = train_test_split(
+    train, train_labels["heart_disease_present"], test_size=0.10, random_state=7
+)
+
+# Fit model on all training data
+model = xgb.XGBClassifier()
+model.fit(X_train, y_train)
+
+# Make predictions
+y_pred = model.predict(X_test)
+predictions = [round(value) for value in y_pred]
+accuracy = accuracy_score(y_test, predictions)
+print("Initial Accuracy: %.2f%%" % (accuracy * 100.0))
+
+# Get feature importances
+thresholds = sort(model.feature_importances_)
+
+# Feature selection loop
+for thresh in thresholds:
+    # ✅ Ensure feature names are passed
+    selection = SelectFromModel(model, threshold=thresh, prefit=True)
+    select_X_train = selection.transform(X_train)
+
+    # ✅ Explicitly align feature names
+    selection_model = xgb.XGBClassifier()
+    selection_model.fit(select_X_train, y_train)
+
+    # Transform test data
+    select_X_test = selection.transform(X_test)
+    y_pred = selection_model.predict(select_X_test)
+    predictions = [round(value) for value in y_pred]
+
+    # Print accuracy
+    accuracy = accuracy_score(y_test, predictions)
+    print("Thresh=%.3f, n=%d, Accuracy: %.2f%%" % (thresh, select_X_train.shape[1], accuracy * 100.0))
+
+
+[CODE CELL]
+train_df = train
+
+[CODE CELL]
+train_X, test_X, train_Y, test_Y = train_test_split(train, train_labels.heart_disease_present, test_size=0.10, stratify=train_labels.heart_disease_present, random_state=42)
+
+print(train_X.shape, test_X.shape)
+print()
+print('Number of rows in Train dataset:',train_X.shape[0])
+#print(train_Y['heart_disease_present'].value_counts())
+print()
+print('Number of rows in Test dataset:',test_X.shape[0])
+#print(test_Y['heart_disease_present'].value_counts())
+
+[CODE CELL]
+scaler = StandardScaler()
+train_X = scaler.fit_transform(train_X)
+test_X = scaler.transform(test_X)
+
+[CODE CELL]
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
+model = xgb.XGBClassifier()
+n_estimators = range(50, 400, 50)
+param_grid = dict(n_estimators=n_estimators)
+kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=7)
+grid_search = GridSearchCV(model, param_grid, scoring="neg_log_loss", n_jobs=-1, cv=kfold)
+grid_result = grid_search.fit(train_X, train_Y.values.ravel())
+# summarize results
+print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+means = grid_result.cv_results_['mean_test_score']
+stds = grid_result.cv_results_['std_test_score']
+params = grid_result.cv_results_['params']
+for mean, stdev, param in zip(means, stds, params):
+	print("%f (%f) with: %r" % (mean, stdev, param))
+# plot
+plt.errorbar(n_estimators, means, yerr=stds)
+plt.title("XGBoost n_estimators vs Log Loss")
+plt.xlabel('n_estimators')
+plt.ylabel('Log Loss')
+plt.savefig('n_estimators.png')
+
+[CODE CELL]
+# grid search
+model = xgb.XGBClassifier()
+max_depth = range(1, 11, 2)
+print(max_depth)
+param_grid = dict(max_depth=max_depth)
+kfold = StratifiedKFold(n_splits=10, shuffle=True, random_state=7)
+grid_search = GridSearchCV(model, param_grid, scoring="neg_log_loss", n_jobs=-1, cv=kfold, verbose=1)
+grid_result = grid_search.fit(train_X, train_Y.values.ravel())
+# summarize results
+print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
+means = grid_result.cv_results_['mean_test_score']
+stds = grid_result.cv_results_['std_test_score']
+params = grid_result.cv_results_['params']
+for mean, stdev, param in zip(means, stds, params):
+	print("%f (%f) with: %r" % (mean, stdev, param))
+# plot
+plt.errorbar(max_depth, means, yerr=stds)
+plt.title("XGBoost max_depth vs Log Loss")
+plt.xlabel('max_depth')
+plt.ylabel('Log Loss')
+plt.savefig('max_depth.png')
+
+[CODE CELL]
+import xgboost as xgb
+print(xgb.__version__)
+
+
+[CODE CELL]
+eval_set = [(train_X, train_Y), (val_X, val_Y)]  # Assuming val_X and val_Y are validation sets
+
+
+[CODE CELL]
+from sklearn.model_selection import train_test_split
+
+# Split data into training and validation sets (80% train, 20% validation)
+train_X, val_X, train_Y, val_Y = train_test_split(
+    train_X, train_Y, test_size=0.2, random_state=42
+)
+
+# Define eval_set for XGBoost
+eval_set = [(train_X, train_Y), (val_X, val_Y)]
+
+# Fit model with evaluation set
+model_base.fit(
+    train_X, train_Y.values.ravel(),
+    eval_set=eval_set,
+    verbose=True
+)
+
+
+[CODE CELL]
+model_base = xgb.XGBClassifier(
+    max_depth=1,
+    subsample=0.33,
+    objective='binary:logistic',
+    n_estimators=50,
+    learning_rate=0.12
+)
+
+# New way to pass eval_metric in XGBoost 2.0+
+model_base.set_params(eval_metric=["error", "logloss"])
+
+# Fit model
+model_base.fit(
+    train_X, train_Y.values.ravel(),
+    eval_set=eval_set,
+    verbose=True
+)
+
+
+
+[CODE CELL]
+%%time
+
+model_base = xgb.XGBClassifier(max_depth=1,
+                        subsample=0.33,
+                        objective='binary:logistic',
+                        n_estimators=50,
+                        learning_rate = 0.12)
+eval_set = [(train_X, train_Y), (test_X, test_Y)]
+model_base.fit(train_X, train_Y.values.ravel(),verbose=True)
+
+[CODE CELL]
+# make predictions for test data
+y_pred = model_base.predict(test_X)
+predictions = [round(value) for value in y_pred]
+
+[CODE CELL]
+# evaluate predictions
+accuracy = accuracy_score(test_Y, predictions)
+print("Accuracy: %.2f%%" % (accuracy * 100.0))
+
+[CODE CELL]
+from sklearn.model_selection import train_test_split
+
+# Ensure original dataset variables
+X = train_X  # Original feature dataset
+Y = train_Y  # Original target dataset
+
+# Split data into training and validation sets (80% train, 20% validation)
+train_X, val_X, train_Y, val_Y = train_test_split(
+    X, Y, test_size=0.2, random_state=42
+)
+
+# Define eval_set correctly
+eval_set = [(train_X, train_Y), (val_X, val_Y)]
+
+# Fit model with evaluation set
+model_base.fit(
+    train_X, train_Y.values.ravel(),
+    eval_set=eval_set,
+    verbose=True
+)
+
+
+[CODE CELL]
+# retrieve performance metrics
+results = model_base.evals_result()
+epochs = len(results['validation_0']['error'])
+x_axis = range(0, epochs)
+# plot log loss
+fig, ax = plt.subplots()
+ax.plot(x_axis, results['validation_0']['logloss'], label='Train')
+ax.plot(x_axis, results['validation_1']['logloss'], label='Test')
+ax.legend()
+plt.ylabel('Log Loss')
+plt.title('XGBoost Log Loss')
+plt.show()
+# plot classification error
+fig, ax = plt.subplots()
+ax.plot(x_axis, results['validation_0']['error'], label='Train')
+ax.plot(x_axis, results['validation_1']['error'], label='Test')
+ax.legend()
+plt.ylabel('Classification Error')
+plt.title('XGBoost Classification Error')
+plt.show()
+
+[MARKDOWN CELL]
+#### XGBoost Parameters
+
+1. General Parameters: Guide the overall functioning
+2. Booster Parameters: Guide the individual booster (tree/regression) at each step
+3. Learning Task Parameters: Guide the optimization performed
+
+For more detail documentation, Please refer the blog post of [XGBoost](https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/)
+
+[MARKDOWN CELL]
+XGBoost has a large number of advanced parameters, which can all affect the quality and speed of your model.
+
+* **max_depth** : int
+     Maximum tree depth for base learners.
+* **learning_rate** : float
+     Boosting learning rate (XGBoost's "eta")
+* **n_estimators** : int
+     Number of boosted trees to fit.
+* **silent** : boolean
+     Whether to print messages while running boosting.
+* **objective** : string
+     Specify the learning task and the corresponding learning objective.
+* **nthread** : int
+     Number of parallel threads used to run XGBoost.
+* **gamma** : float
+     Minimum loss reduction required to make a further partition on a leaf node of the tree.
+* **min_child_weight** : int
+     Minimum sum of instance weight(hessian) needed in a child.
+* **max_delta_step** : int
+     Maximum delta step we allow each tree's weight estimation to be.
+* **subsample** : float
+     Subsample ratio of the training instance.
+* **colsample_bytree** : float
+     Subsample ratio of columns when constructing each tree.
+* **base_score**:
+     The initial prediction score of all instances, global bias.
+* **seed** : int
+     Random number seed.
+* **missing** : float, optional
+     Value in the data which needs to be present as a missing value.
+     If None, defaults to np.nan.
+
+[MARKDOWN CELL]
+#### Using Hyperopt For Grid Searching
+
+[CODE CELL]
+!pip install hyperopt
+
+[CODE CELL]
+from hyperopt import hp, fmin, tpe, STATUS_OK, Trials
+from sklearn.metrics import roc_auc_score
+
+[CODE CELL]
+train = train_X
+valid = test_X
+
+y_train = train_Y
+y_valid = test_Y
+
+
+[CODE CELL]
+def objective(space):
+
+    clf = xgb.XGBClassifier(n_estimators = 50,
+                            max_depth = space['max_depth'],
+                            min_child_weight = space['min_child_weight'],
+                            subsample = space['subsample'])
+
+    eval_set  = [( train, y_train), ( valid, y_valid)]
+
+    clf.fit(train, y_train,
+            eval_set=eval_set, eval_metric="auc",
+            early_stopping_rounds=30)
+
+    pred = clf.predict_proba(valid)[:,1]
+    auc = roc_auc_score(y_valid, pred)
+    print ("SCORE:", auc)
+
+    return{'loss':1-auc, 'status': STATUS_OK }
+
+
+
+
+[CODE CELL]
+space ={
+        'max_depth': hp.choice("x_max_depth", np.arange(5, 25, dtype=int)),
+        'min_child_weight': hp.choice ('x_min_child',np.arange(1, 10, dtype=int)),
+        'subsample': hp.uniform ('x_subsample', 0.8, 1)
+    }
+
+[CODE CELL]
+# Create an XGBoost model
+model_base = xgb.XGBClassifier(
+    max_depth=1,
+    subsample=0.33,
+    objective='binary:logistic',
+    n_estimators=50,
+    learning_rate=0.12
+)
+
+# ✅ Set eval_metric using .set_params()
+model_base.set_params(eval_metric=["error", "logloss"])
+
+# Fit the model (without eval_metric in fit)
+model_base.fit(
+    train_X, train_Y.values.ravel(),
+    eval_set=eval_set,  # Ensure eval_set is properly defined
+    verbose=True
+)
+
+
+[MARKDOWN CELL]
+x_max_depth': 19, 'x_min_child': 6, 'x_subsample': 0.8325428224507427
+
+[CODE CELL]
+%%time
+
+import xgboost as xgb
+
+# Create XGBClassifier
+model = xgb.XGBClassifier(
+    max_depth=19,
+    subsample=0.8325428224507427,
+    min_child=6,  # min_child_weight is the correct parameter, was 'min_child'
+    objective='binary:logistic',
+    n_estimators=50,
+    learning_rate=0.1
+)
+
+# ✅ Set parameters separately
+model.set_params(eval_metric=["error", "logloss"], early_stopping_rounds=15)
+
+# Define eval_set
+eval_set = [(train_X, train_Y), (test_X, test_Y)]
+
+# Fit model
+model.fit(
+    train_X, train_Y.values.ravel(),
+    eval_set=eval_set,
+    verbose=True
+)
+
+
+[CODE CELL]
+# make predictions for test data
+y_pred_hyperopt = model.predict(test_X)
+predictions = [round(value) for value in y_pred_hyperopt]
+
+[CODE CELL]
+# evaluate predictions
+accuracy = accuracy_score(test_Y, predictions)
+print("Accuracy: %.2f%%" % (accuracy * 100.0))
+
+[CODE CELL]
+# retrieve performance metrics
+results = model.evals_result()
+epochs = len(results['validation_0']['error'])
+x_axis = range(0, epochs)
+# plot log loss
+fig, ax = plt.subplots()
+ax.plot(x_axis, results['validation_0']['logloss'], label='Train')
+ax.plot(x_axis, results['validation_1']['logloss'], label='Test')
+ax.legend()
+plt.ylabel('Log Loss')
+plt.title('XGBoost Log Loss')
+plt.show()
+# plot classification error
+fig, ax = plt.subplots()
+ax.plot(x_axis, results['validation_0']['error'], label='Train')
+ax.plot(x_axis, results['validation_1']['error'], label='Test')
+ax.legend()
+plt.ylabel('Classification Error')
+plt.title('XGBoost Classification Error')
+plt.show()
+
+[MARKDOWN CELL]
+This score is less than our baseline score. We have to tune the model further.
+The classification error is very high in test dataset
+
+[MARKDOWN CELL]
+#### Hyperparameter tuning in XGBoost
+
+[CODE CELL]
+#X_train, X_test, y_train, y_test = train_test_split(train, train_labels.heart_disease_present,test_size=.1, random_state=42)
+
+print(train_X.shape)
+print(test_X.shape)
+
+print(train_Y.shape)
+print(test_Y.shape)
+
+[CODE CELL]
+dtrain = xgb.DMatrix(train_X, label=train_Y)
+dtest = xgb.DMatrix(test_X, label=test_Y)
+
+[MARKDOWN CELL]
+#### The params dictionary
+
+[CODE CELL]
+params = {
+    # Parameters that we are going to tune.
+    'max_depth':6,
+    'min_child_weight': 1,
+    'eta':.3,
+    'subsample': 1,
+    'colsample_bytree': 1,
+    # Other parameters
+    'objective':'binary:logistic',
+     'n_estimators' :50,
+     'learning_rate' : 0.12
+}
+
+[MARKDOWN CELL]
+#### Parameters num_boost_round and early_stopping_rounds
+
+[CODE CELL]
+params['eval_metric'] = "logloss"
+
+[CODE CELL]
+num_boost_round = 999
+
+[CODE CELL]
+model = xgb.train(
+    params,
+    dtrain,
+    num_boost_round=num_boost_round,
+    evals=[(dtest, "Test")],
+    early_stopping_rounds=10,
+
+)
+print("Best log loss: {:.2f} with {} rounds".format(
+                 model.best_score,
+                 model.best_iteration+1))
+
+[MARKDOWN CELL]
+As you can see we stopped before reaching the maximum number of boosting rounds, that’s because after the 40th tree, adding more rounds did not lead to improvements of log loss on the test dataset.
+
+[MARKDOWN CELL]
+#### Using XGBoost’s CV
+
+In order to tune the other hyperparameters, we will use the cv function from XGBoost.
+t allows us to run cross-validation on our training dataset and returns a mean log loss.
+
+The following are the parameters which are passed to the function:
+
+* **params**: our dictionary of parameters.
+* **dtrain** matrix.
+* **num_boost_round**: number of boosting rounds. Here we will use a large number again and count **early_stopping_rounds** to find the optimal number of rounds before reaching the maximum.
+* **seed**: random seed. It's important to set a seed here, to ensure we are using the same folds for each step so we can properly compare the scores with different parameters.
+* **nfold**: the number of folds to use for cross-validation
+* **metrics**: the metrics to use to evaluate our model, here we use log loss.
+
+[CODE CELL]
+cv_results = xgb.cv(
+    params,
+    dtrain,
+    num_boost_round=num_boost_round,
+    seed=42,
+    nfold=5,
+    metrics={'logloss'},
+    early_stopping_rounds=10
+)
+cv_results
+
+[MARKDOWN CELL]
+cv returns a table where the rows correspond to the number of boosting trees used, here again, we stopped before the 999 rounds.
+
+The 4 columns correspond to the mean and standard deviation of logloss on the test dataset and on the train dataset. For this tutorial we will only try to improve the mean test logloss. We can get the lowest logloss score from cv with:
+
+[CODE CELL]
+cv_results['test-logloss-mean'].min()
+
+[MARKDOWN CELL]
+#### Parameters max_depth and min_child_weight
+
+Those parameters add constraints on the architecture of the trees.
+
+* **max_depth** is the maximum number of nodes allowed from the root to the farthest leaf of a tree. Deeper trees can model more complex relationships by adding more nodes, but as we go deeper, splits become less relevant and are sometimes only due to noise, causing the model to overfit.
+* **min_child_weight** is the minimum weight (or number of samples if all samples have a weight of 1) required in order to create a new node in the tree. A smaller min_child_weight allows the algorithm to create children that correspond to fewer samples, thus allowing for more complex trees, but again, more likely to overfit.
+
+
+[CODE CELL]
+gridsearch_params = [
+    (max_depth, min_child_weight)
+    for max_depth in range(1,25)
+    for min_child_weight in range(3,20)
+]
+
+[CODE CELL]
+# Define initial best params and MAE
+min_logloss = float("Inf")
+best_params = None
+for max_depth, min_child_weight in gridsearch_params:
+    print("CV with max_depth={}, min_child_weight={}".format(
+                             max_depth,
+                             min_child_weight))
+    # Update our parameters
+    params['max_depth'] = max_depth
+    params['min_child_weight'] = min_child_weight
+    # Run CV
+    cv_results = xgb.cv(
+        params,
+        dtrain,
+        num_boost_round=num_boost_round,
+        seed=42,
+        nfold=5,
+        metrics={'logloss'},
+        early_stopping_rounds=10
+    )
+    # Update best MAE
+    mean_logloss = cv_results['test-logloss-mean'].min()
+    boost_rounds = cv_results['test-logloss-mean'].argmin()
+    print("\tlogloss {} for {} rounds".format(min_logloss, boost_rounds))
+    if mean_logloss < min_logloss:
+        min_logloss = mean_logloss
+        best_params = (max_depth,min_child_weight)
+print("Best params: {}, {}, logloss: {}".format(best_params[0], best_params[1], min_logloss))
+
+[MARKDOWN CELL]
+**Best params**:
+* max_depth = 1,
+* min_child_weight = 4,
+* logloss: 0.4457426
+
+[MARKDOWN CELL]
+let's update our params
+
+[CODE CELL]
+params['max_depth'] = 1
+params['min_child_weight'] = 4
+
+[MARKDOWN CELL]
+#### Parameters subsample and colsample_bytree
+
+Instead of using the whole training set every time, we can build a tree on slightly different data at each step, which makes it less likely to overfit to a single sample or feature.
+
+* **subsample** corresponds to the fraction of observations (the rows) to subsample at each step. By default it is set to 1 meaning that we use all rows.
+* **colsample_bytree corresponds** to the fraction of features (the columns) to use. By default it is set to 1 meaning that we will use all features.
+
+[CODE CELL]
+gridsearch_params = [
+    (subsample, colsample)
+    for subsample in [i/10. for i in range(1,10)]
+    for colsample in [i/10. for i in range(1,10)]
+]
+
+[CODE CELL]
+min_logloss = float("Inf")
+best_params = None
+# We start by the largest values and go down to the smallest
+for subsample, colsample in reversed(gridsearch_params):
+    print("CV with subsample={}, colsample={}".format(
+                             subsample,
+                             colsample))
+    # We update our parameters
+    params['subsample'] = subsample
+    params['colsample_bytree'] = colsample
+    # Run CV
+    cv_results = xgb.cv(
+        params,
+        dtrain,
+        num_boost_round=num_boost_round,
+        seed=42,
+        nfold=5,
+        metrics={'logloss'},
+        early_stopping_rounds=10
+    )
+    # Update best score
+    mean_logloss = cv_results['test-logloss-mean'].min()
+    boost_rounds = cv_results['test-logloss-mean'].argmin()
+    print("\tlogloss {} for {} rounds".format(mean_logloss, boost_rounds))
+    if mean_logloss < min_logloss:
+        min_logloss = mean_logloss
+        best_params = (subsample,colsample)
+print("Best params: {}, {}, logloss: {}".format(best_params[0], best_params[1], min_logloss))
+
+[MARKDOWN CELL]
+**Best params**:
+* subsample = 0.8
+* colsample = 0.1,
+* logloss: 0.40887080000000003
+
+[CODE CELL]
+params['subsample'] = 0.8
+params['colsample_bytree'] = 0.1
+
+[MARKDOWN CELL]
+#### Parameter ETA
+
+The ETA parameter controls the learning rate. It corresponds to the shrinkage of the weights associated to features after each round, in other words it defines the amount of "correction" we make at each step
+
+[CODE CELL]
+%time
+# This can take some time…
+min_logloss = float("Inf")
+best_params = None
+for eta in [.3, .2, .1, .05, .01, .005]:
+    print("CV with eta={}".format(eta))
+    # We update our parameters
+    params['eta'] = eta
+    # Run and time CV
+    %time cv_results = xgb.cv(params,dtrain,num_boost_round=num_boost_round,seed=42,nfold=5,metrics=['logloss'],early_stopping_rounds=10)
+    # Update best score
+    mean_logloss = cv_results['test-logloss-mean'].min()
+    boost_rounds = cv_results['test-logloss-mean'].argmin()
+    print("\tMAE {} for {} rounds\n".format(mean_logloss, boost_rounds))
+    if mean_logloss < min_logloss:
+        min_logloss = mean_logloss
+        best_params = eta
+print("Best params: {}, logloss: {}".format(best_params, min_logloss))
+
+[MARKDOWN CELL]
+**Best params**:
+* ETA = 0.3,
+* logloss: 0.40887080000000003
+
+[CODE CELL]
+params['eta'] = 0.3
+
+[CODE CELL]
+params
+
+[CODE CELL]
+model = xgb.train(
+    params,
+    dtrain,
+    num_boost_round=num_boost_round,
+    evals=[(dtest, "Test")],
+    early_stopping_rounds=30
+)
+
+[CODE CELL]
+num_boost_round = model.best_iteration + 1
+best_model = xgb.train(
+    params,
+    dtrain,
+    num_boost_round=num_boost_round,
+    evals=[(dtest, "Test")]
+)
+
+[CODE CELL]
+print(train_X.shape)
+print(test_X.shape)
+
+print(train_Y.shape)
+print(test_Y.shape)
+
+[CODE CELL]
+import xgboost as xgb
+
+# Ensure params is correctly formatted (don't use "params" argument in XGBClassifier)
+xgb_model = xgb.XGBClassifier(**params)  # Unpack dictionary correctly
+
+# ✅ Set parameters separately
+xgb_model.set_params(eval_metric=["error", "logloss"], early_stopping_rounds=15)
+
+# Define eval_set
+eval_set = [(train_X, train_Y), (test_X, test_Y)]
+
+# Fit model
+xgb_model.fit(
+    train_X, train_Y.values.ravel(),
+    eval_set=eval_set,
+    verbose=True
+)
+
+
+[CODE CELL]
+# make predictions for test data
+y_pred_gs = xgb_model.predict(test_X)
+predictions = [round(value) for value in y_pred_gs]
+
+[CODE CELL]
+# evaluate predictions
+accuracy = accuracy_score(test_Y, predictions)
+print("Accuracy: %.2f%%" % (accuracy * 100.0))
+
+[CODE CELL]
+# retrieve performance metrics
+results = xgb_model.evals_result()
+epochs = len(results['validation_0']['error'])
+x_axis = range(0, epochs)
+# plot log loss
+fig, ax = plt.subplots()
+ax.plot(x_axis, results['validation_0']['logloss'], label='Train')
+ax.plot(x_axis, results['validation_1']['logloss'], label='Test')
+ax.legend()
+plt.ylabel('Log Loss')
+plt.title('XGBoost Log Loss')
+plt.show()
+# plot classification error
+fig, ax = plt.subplots()
+ax.plot(x_axis, results['validation_0']['error'], label='Train')
+ax.plot(x_axis, results['validation_1']['error'], label='Test')
+ax.legend()
+plt.ylabel('Classification Error')
+plt.title('XGBoost Classification Error')
+plt.show()
+
+[CODE CELL]
+###################################################################################
+
+[MARKDOWN CELL]
+#### Submit the predictions
+
+[CODE CELL]
+scaler = StandardScaler()
+train_df = scaler.fit_transform(train_df)
+
+[CODE CELL]
+in_sample_preds = xgb_model.predict_proba(train_df)
+
+[CODE CELL]
+log_loss(train_labels.heart_disease_present, in_sample_preds)
+
+[CODE CELL]
+test_values_subset = test
+
+[CODE CELL]
+test_values_subset = scaler.transform(test_values_subset)
+
+[CODE CELL]
+predictions = xgb_model.predict_proba(test_values_subset)[:, 1]
+
+[CODE CELL]
+predictions = np.round(predictions, 2)
+
+[CODE CELL]
+submission_format = pd.read_csv('submission_format.csv', index_col='patient_id')
+
+[CODE CELL]
+my_submission = pd.DataFrame(data=predictions,
+                             columns=submission_format.columns,
+                             index=submission_format.index)
+
+[CODE CELL]
+my_submission.head(10)
+
+[CODE CELL]
+my_submission.to_csv('submission_result.csv', index='patient_id')
+submission = pd.read_csv('submission_result.csv')
+
+[CODE CELL]
+submission.head()
+
+[MARKDOWN CELL]
+#### Submit base model predictions
+
+[CODE CELL]
+sample_preds = model_base.predict_proba(train_df)
+
+[CODE CELL]
+log_loss(train_labels.heart_disease_present, sample_preds)
+
+[CODE CELL]
+predictions_base = model_base.predict_proba(test_values_subset)[:, 1]
+
+[CODE CELL]
+predictions_base = np.round(predictions_base, 2)
+
+[CODE CELL]
+submission_format_base = pd.read_csv('submission_format.csv', index_col='patient_id')
+
+[CODE CELL]
+submission_base = pd.DataFrame(data=predictions_base,
+                             columns=submission_format_base.columns,
+                             index=submission_format_base.index)
+
+[CODE CELL]
+submission_base.head(10)
+
+[CODE CELL]
+submission_base.to_csv('submission_baseline.csv', index='patient_id')
+submission_b = pd.read_csv('submission_baseline.csv')
+
+[CODE CELL]
+submission_b.head()
+
+[MARKDOWN CELL]
+Resources:
+1. [Dataset](https://www.drivendata.org/competitions/54/machine-learning-with-a-heart/data/)
+2. [XgBoost hyper parameter tuning blog](https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/)
+3. [Hyperopt](https://www.dataiku.com/learn/guide/code/python/advanced-xgboost-tuning.html)
+
