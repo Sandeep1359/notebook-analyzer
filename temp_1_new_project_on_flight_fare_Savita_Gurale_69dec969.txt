@@ -1,0 +1,1048 @@
+[MARKDOWN CELL]
+# 1. Business Case:-  FlightPricePrediction
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+# Problem Statement:-
+
+Task 1:-Prepare a complete data analysis report on the given data.
+
+Task 2:-Create a predictive model which will help the customers to predict future flight prices and plan their journey accordingly.
+
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+# 2. Importing basic Libraries
+
+[CODE CELL]
+
+
+[CODE CELL]
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+%matplotlib inline
+import warnings
+warnings.filterwarnings('ignore')
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+# 3. Loading of the  data
+
+[CODE CELL]
+flight = pd.read_excel('Flight_fare.xlsx')
+
+[CODE CELL]
+flight
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+# 4.Basic checks
+
+[CODE CELL]
+# display first 5 rows
+flight.head()
+
+[CODE CELL]
+# display last 5 rows
+flight.tail()
+
+[CODE CELL]
+# chack the rows and columns in dataset
+flight.shape
+
+[CODE CELL]
+# info of the columns
+flight.info()
+
+[CODE CELL]
+flight['Duration'].value_counts()
+
+[CODE CELL]
+num_col = flight.select_dtypes(include=['int','float'])
+num_col.columns
+
+[CODE CELL]
+cat_col = flight.select_dtypes(include='O')
+cat_col.columns
+
+[CODE CELL]
+# check the all  categorical column unique value
+for i in cat_col:
+    print(i,cat_col[i].unique())
+    print(cat_col[i].value_counts())
+    print('______________________________________________________________________________')
+
+[CODE CELL]
+flight.columns
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+
+
+[MARKDOWN CELL]
+# 5. Domain Analysis:-
+
+[RAW CELL]
+1.	Airline: So this column will have all the types of airlines like Indigo, Jet Airways, Air India, and many more.
+2.	Date_of_Journey: This column will let us know about the date on which the passenger’s journey will start.
+3.	Source: This column holds the name of the place from where the passenger’s journey will start.
+4.	Destination: This column holds the name of the place to where passengers wanted to travel.
+5.	Route: Here we can know about what the route is through which passengers have opted to travel from his/her source to their destination.
+6.	Arrival_Time: Arrival time is when the passenger will reach his/her destination.
+7.	Duration: Duration is the whole period that a flight will take to complete its journey from source to destination.
+8.	Total_Stops: This will let us know in how many places flights will stop there for the flight in the whole journey.
+9.	Additional_Info: In this column, we will get information about food, kind of food, and other amenities.
+10.	Price: Price of the flight for a complete journey including all the expenses before onboarding.
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+# 6. Exploratory Data Analysis
+
+[MARKDOWN CELL]
+## Univariate Analysis
+
+[CODE CELL]
+
+# Airline Distribution
+plt.figure(figsize=(12, 6))
+sns.countplot(y=flight['Airline'], order=flight['Airline'].value_counts().index, palette='viridis')
+plt.title("Airline Distribution")
+plt.xlabel("Count")
+plt.ylabel("Airline")
+plt.show()
+
+# Total Stops Distribution
+plt.figure(figsize=(8, 5))
+sns.countplot(x=flight['Total_Stops'], palette='muted', order=flight['Total_Stops'].value_counts().index)
+plt.title("Total Stops Distribution")
+plt.xlabel("Total Stops")
+plt.ylabel("Count")
+plt.show()
+
+# Price Distribution
+plt.figure(figsize=(10, 6))
+sns.histplot(flight['Price'], kde=True, color='blue', bins=10)
+plt.title("Price Distribution")
+plt.xlabel("Price")
+plt.ylabel("Frequency")
+plt.show()
+
+
+[MARKDOWN CELL]
+# Insights from Univariate Analysis:
+
+* Price Distribution:
+
+Most flights have ticket prices ranging between ₹5,000 and ₹15,000.
+
+The distribution is skewed right, indicating the presence of a few high-priced tickets.
+
+* Total Stops Distribution:
+
+Flights with 1 stop are the most common, followed by non-stop flights.
+
+Flights with 3 stops and 4 stops are very rare.
+
+* Airline Distribution:
+
+Jet Airways, IndiGo, and Air India operate the majority of the flights.
+
+Airlines like Trujet and Vistara Premium Economy have a much smaller share of flights.
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+##  Bivariate analysis
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Bivariate Analysis: Price vs Total_Stops
+plt.figure(figsize=(8, 6))
+sns.boxplot(x='Total_Stops', y='Price', data=flight, palette='viridis')
+plt.title('Price vs Total Stops', fontsize=14)
+plt.xlabel('Total Stops', fontsize=12)
+plt.ylabel('Price', fontsize=12)
+plt.show()
+
+# Bivariate Analysis: Price vs Airline
+plt.figure(figsize=(12, 8))
+sns.boxplot(y='Airline', x='Price', data=flight, palette='coolwarm',
+            order=flight.groupby('Airline')['Price'].median().sort_values().index)
+plt.title('Price vs Airline', fontsize=14)
+plt.xlabel('Price', fontsize=12)
+plt.ylabel('Airline', fontsize=12)
+plt.show()
+
+
+[MARKDOWN CELL]
+# Insights from Bivariate Analysis:
+
+* Price vs Total Stops:
+
+Non-stop flights generally have lower ticket prices compared to flights with stops.
+
+Flights with 2 stops are costlier on average compared to other categories.
+
+Flights with 3 or more stops have a wider price range, including some very expensive options.
+
+
+* Price vs Airline:
+
+Airlines like Jet Airways Business and Multiple carriers Premium Economy have the highest ticket prices.
+
+IndiGo and SpiceJet are budget-friendly airlines with relatively lower ticket prices.
+
+Airlines such as Air India and Vistara Premium Economy are in the mid-price range.
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+# 7. data preprocessing
+
+[CODE CELL]
+# finding missing values
+flight.isnull().sum()
+
+[CODE CELL]
+flight.dropna(inplace=True)
+flight.isnull().sum()
+
+[CODE CELL]
+flight.head()
+
+[MARKDOWN CELL]
+# 8. Feature engenaring
+
+[CODE CELL]
+flight['Journey_Day'] = pd.to_datetime(flight.Date_of_Journey, format='%d/%m/%Y').dt.day
+
+[CODE CELL]
+flight['Journey_Month'] = pd.to_datetime(flight.Date_of_Journey, format='%d/%m/%Y').dt.month
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+flight['Dep_hour'] = pd.to_datetime(flight.Dep_Time ).dt.hour
+flight['Dep_Minutes'] = pd.to_datetime(flight.Dep_Time ).dt.minute
+flight.head()
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+flight['Journey_Day'] = pd.to_datetime(flight.Date_of_Journey, format='%d/%m/%Y').dt.day
+flight['Journey_Month'] = pd.to_datetime(flight.Date_of_Journey, format='%d/%m/%Y').dt.month
+flight.head()
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+flight['Arrival_hour'] = pd.to_datetime(flight.Arrival_Time ).dt.hour
+flight['Arrival_Minutes'] = pd.to_datetime(flight.Arrival_Time ).dt.minute
+flight.head()
+
+[CODE CELL]
+flight.drop(columns=['Dep_Time' , 'Date_of_Journey'],inplace=True)
+
+[CODE CELL]
+flight.drop(columns='Arrival_Time',inplace=True)
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+import re
+
+# Create empty lists for hours and minutes
+duration_hour = []
+duration_minute = []
+
+# Regex pattern to match hours and minutes (e.g., "5h 30m", "3h", "45m")
+pattern = re.compile(r'(?:(\d+)h)? ?(?:(\d+)m)?')
+
+# Loop through each duration and use regex to extract hours and minutes
+for dur in flight.Duration:
+    match = pattern.match(dur)
+    hours = int(match.group(1)) if match.group(1) else 0
+    minutes = int(match.group(2)) if match.group(2) else 0
+
+    duration_hour.append(hours)
+    duration_minute.append(minutes)
+
+# Now duration_hour and duration_minute contain the parsed values
+
+[CODE CELL]
+flight['Duration_Hour'] = duration_hour
+flight['Duration_Minute'] = duration_minute
+
+[CODE CELL]
+flight.drop(columns='Duration',inplace=True)
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+flight['Airline'].value_counts()
+
+[CODE CELL]
+Airline = flight[['Airline']]
+
+[CODE CELL]
+Airline = pd.get_dummies(Airline, drop_first=True)
+
+[CODE CELL]
+
+Airline.head()
+
+[CODE CELL]
+# Assuming your dataframe is named 'Airline'
+Airline = Airline.astype(int)
+
+
+[CODE CELL]
+Airline.head()
+
+[CODE CELL]
+flight['Source'].value_counts()
+
+[CODE CELL]
+sns.catplot(y='Price' , x='Source', data=flight.sort_values('Price', ascending=False),kind='boxen',height=6, aspect=3)
+
+[CODE CELL]
+Source = flight[['Source']]
+
+[CODE CELL]
+Source = pd.get_dummies(Source, drop_first=True)
+
+[CODE CELL]
+Source.head()
+
+[CODE CELL]
+
+Source = Source.astype(int)
+
+
+[CODE CELL]
+Source.head()
+
+[CODE CELL]
+flight['Destination'].value_counts()
+
+[CODE CELL]
+Destination = flight[['Destination']]
+
+[CODE CELL]
+Destination = pd.get_dummies(Destination, drop_first=True)
+
+[CODE CELL]
+Destination.head()
+
+[CODE CELL]
+
+Destination = Destination .astype(int)
+
+
+[CODE CELL]
+Destination.head()
+
+[CODE CELL]
+flight['Route']
+
+[CODE CELL]
+flight.drop(columns=['Route','Additional_Info'],axis=1, inplace=True)
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+
+
+[CODE CELL]
+flight['Total_Stops'].value_counts()
+
+[CODE CELL]
+
+
+[CODE CELL]
+# Create a mapping dictionary
+stop_mapping = {
+    'non-stop': 0,
+    '1 stop': 1,
+    '2 stops': 2,
+    '3 stops': 3,
+    '4 stops': 4
+}
+
+# Apply the mapping to the column
+flight['Total_Stops'] = flight['Total_Stops'].map(stop_mapping)
+
+
+[MARKDOWN CELL]
+flight.replace( {'non-stop':0 ,'1 stop':1,' 2stop':2,'3 stop':3,'4 stop':4 } ,inplace=True )
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+flight = pd.concat( [ flight, Airline, Source, Destination ] , axis=1)
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+pd.set_option('display.Max_columns',None)
+pd.set_option('display.Max_rows',None)
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+flight.drop(columns= ['Airline' , 'Source' , 'Destination' ] , inplace=True)
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+flight.shape
+
+[MARKDOWN CELL]
+## Test Data
+
+[CODE CELL]
+flight_test  = pd.read_excel('Flight_fare.xlsx')
+flight_test.head()
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+flight_test.head()
+
+[CODE CELL]
+flight.head()
+
+[CODE CELL]
+flight.shape , flight_test.shape
+
+[CODE CELL]
+x = flight.drop(columns='Price',axis=1)
+y = flight['Price']
+x.head()
+
+[CODE CELL]
+y.head()
+
+[CODE CELL]
+## check corr-relaction
+plt.figure(figsize=(40,30))
+sns.heatmap(flight.corr(),annot=True,linewidth=0.9,cmap='rainbow')
+
+[CODE CELL]
+
+
+[CODE CELL]
+# Splitting the data into training and testing
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=34)
+
+
+[MARKDOWN CELL]
+# 9.  Model Building
+
+[MARKDOWN CELL]
+## Linear Regression
+
+[CODE CELL]
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Model Training
+LR = LinearRegression()
+LR.fit(x_train, y_train)
+
+# Predictions
+y_pred = LR.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: Linear Regression")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[MARKDOWN CELL]
+## Ridge
+
+[CODE CELL]
+from sklearn.linear_model import Ridge
+
+# Model Training
+Rr = Ridge(alpha=1.0)
+Rr.fit(x_train, y_train)
+
+# Predictions
+y_pred = Rr.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: Ridge Regression")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[MARKDOWN CELL]
+## Lasso
+
+[CODE CELL]
+from sklearn.linear_model import Lasso
+
+# Model Training
+Lasoo = Lasso(alpha=0.1)
+Lasoo.fit(x_train, y_train)
+
+# Predictions
+y_pred = Lasoo.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: Lasso Regression")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[MARKDOWN CELL]
+## Decision Tree
+
+[CODE CELL]
+from sklearn.tree import DecisionTreeRegressor
+
+# Model Training
+Dt = DecisionTreeRegressor()
+Dt.fit(x_train, y_train)
+
+# Predictions
+y_pred = Dt.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: Decision Tree Regressor")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[MARKDOWN CELL]
+## Random Forest
+
+[CODE CELL]
+from sklearn.ensemble import RandomForestRegressor
+
+# Model Training
+RF = RandomForestRegressor(n_estimators=100, random_state=42)
+RF.fit(x_train, y_train)
+
+# Predictions
+y_pred = RF.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: Random Forest Regressor")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[MARKDOWN CELL]
+## Gradient boosting
+
+[CODE CELL]
+from sklearn.ensemble import GradientBoostingRegressor
+
+# Model Training
+GBR = GradientBoostingRegressor()
+GBR.fit(x_train, y_train)
+
+# Predictions
+y_pred = GBR.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: Gradient Boosting Regressor")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+## XGBoost Regressor
+
+[CODE CELL]
+from xgboost import XGBRegressor
+
+# Model Training
+Xg = XGBRegressor()
+Xg.fit(x_train, y_train)
+
+# Predictions
+y_pred = Xg.predict(x_test)
+
+# Metrics
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print("Model: XGBoost Regressor")
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+algorithms = [
+    "LinearRegression","Ridge","Lasso", "Decision Tree",
+      " Gradient boosting", "Random Forest", "XGBoost Regressor"
+
+]
+accuracies = [0.65, 0.65, 0.65, 0.74,  0.78, 0.84,0.86]
+
+
+colors = [
+    'blue', 'green', 'orange', 'purple',
+    'red', 'cyan'
+]
+
+plt.figure(figsize=(14, 7))
+bars = plt.bar(algorithms, accuracies, color=colors, edgecolor='black')
+
+
+for bar, acc in zip(bars, accuracies):
+    plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{acc*100:.1f}%",
+             ha='center', va='bottom', fontsize=10, color='black')
+
+plt.xlabel("Algorithms", fontsize=14)
+plt.ylabel("Accuracy (%)", fontsize=14)
+plt.title("Accuracy of Different Algorithms", fontsize=16)
+plt.xticks(rotation=45, ha="right")
+plt.ylim(0, 1)
+
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+
+plt.tight_layout()
+plt.show()
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+
+
+algorithms = [
+    "LinearRegression","Ridge","Lasso", "Decision Tree",
+      " Gradient boosting", "Random Forest", "XGBoost Regressor"
+
+]
+accuracies = [0.65, 0.65, 0.65, 0.74,  0.78, 0.84,0.86]
+
+plt.figure(figsize=(10, 10))
+explode = [0.05] * len(algorithms)
+plt.pie(
+    accuracies, labels=algorithms, autopct='%1.1f%%',
+    startangle=140, explode=explode, colors=plt.cm.tab20.colors
+)
+
+
+plt.title("Algorithm Accuracy Distribution", fontsize=16)
+
+
+plt.tight_layout()
+plt.show()
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+plt.figure(figsize=(10, 10))
+explode = [0.05] * len(algorithms)
+
+# Donut Chart
+wedges, texts, autotexts = plt.pie(
+    accuracies, labels=algorithms, autopct='%1.1f%%',
+    startangle=140, explode=explode, colors=plt.cm.tab20.colors
+)
+# Inner white circle for donut effect
+plt.gca().add_artist(plt.Circle((0, 0), 0.7, color='white'))
+
+plt.title("Algorithm Accuracy Distribution (Donut Chart)", fontsize=16)
+plt.tight_layout()
+plt.show()
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+swati.............
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+from sklearn.ensemble import RandomForestRegressor
+rfr = RandomForestRegressor()
+rfr.fit(x_train, y_train)
+
+
+
+[CODE CELL]
+pred = rfr.predict(x_test)
+
+
+[CODE CELL]
+rfr.score(x_train, y_train)
+
+
+[CODE CELL]
+rfr.score(x_test, y_test)
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+sns.displot(y_test - pred)
+
+[CODE CELL]
+plt.scatter(y_test , pred , alpha=0.8)
+plt.xlabel('y_test')
+plt.ylabel('pred')
+
+[CODE CELL]
+# MAE, MSE, RMSE
+from sklearn import metrics
+print('MAE:' , metrics.mean_absolute_error(y_test,pred))
+print('MSE:' , metrics.mean_squared_error(y_test,pred))
+print('RMSE:' , np.sqrt(metrics.mean_squared_error(y_test,pred)))
+
+
+[CODE CELL]
+metrics.r2_score(y_test,pred)
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+## HYPERPARAMETER TUNIG
+
+[CODE CELL]
+from sklearn.model_selection import RandomizedSearchCV
+
+
+[CODE CELL]
+n_estimators = [10, 50, 100]  # Example values
+max_depth = [None, 10, 20]
+min_samples_split = [2, 5, 10]
+min_samples_leaf = [1, 2, 4]
+max_features = ['auto', 'sqrt', 'log2']
+
+random_search = {
+    "n_estimators": n_estimators,
+    "max_depth": max_depth,
+    "min_samples_split": min_samples_split,
+    "min_samples_leaf": min_samples_leaf,
+    "max_features": max_features
+}
+
+print(random_search)
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+rfr_random = RandomizedSearchCV(
+    estimator=rfr,
+    param_distributions=random_search,
+    n_iter=10,
+    cv=5,
+    verbose=2,
+    random_state=51,
+    n_jobs=-1
+)
+
+
+[CODE CELL]
+print(x_train.shape)
+print(y_train.shape)
+
+
+[CODE CELL]
+y_train = y_train[:x_train.shape[0]]
+
+
+[CODE CELL]
+x_train = x_train[:y_train.shape[0]]
+
+
+[CODE CELL]
+print(x_train.shape)
+print(y_train.shape)
+
+
+[CODE CELL]
+rfr_random.fit(x_train, y_train)
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+rfr_random.fit(x_train, y_train)
+
+
+[CODE CELL]
+rfr_random.best_params_
+
+[CODE CELL]
+
+
+[CODE CELL]
+prediction = rfr_random.predict(x_test)
+
+
+[CODE CELL]
+plt.figure(figsize=(8, 8))
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+print(y_test.shape)
+print(prediction.shape)
+
+
+[CODE CELL]
+y_test = y_test[:prediction.shape[0]]
+
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+residuals = y_test - prediction
+plt.figure(figsize=(8, 8))
+sns.histplot(residuals, kde=True)
+plt.show()
+
+
+[CODE CELL]
+plt.scatter(y_test , pred , alpha=0.8)
+plt.xlabel('y_test')
+plt.ylabel('pred')
+
+[CODE CELL]
+print('MAE:', metrics.mean_absolute_error(y_test, prediction))
+print('MSE:', metrics.mean_squared_error(y_test, prediction))
+print('RMSE:', np.sqrt(metrics.mean_squared_error(y_test, prediction)))
+
+
+[CODE CELL]
+
+
+[CODE CELL]
+metrics.r2_score(y_test,prediction)
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+algorithms = [
+    "Logistic Regression","Ridge","Lasso", "Decision Tree",
+    "Random Forest", "SVR"
+
+]
+accuracies = [0.65, 0.65, 0.65, 0.74, 0.84, 0.00]
+
+
+colors = [
+    'blue', 'green', 'orange', 'purple',
+    'red', 'cyan', 'magenta', 'lime',
+    'yellow'
+]
+
+plt.figure(figsize=(14, 7))
+bars = plt.bar(algorithms, accuracies, color=colors, edgecolor='black')
+
+
+for bar, acc in zip(bars, accuracies):
+    plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{acc*100:.1f}%",
+             ha='center', va='bottom', fontsize=10, color='black')
+
+plt.xlabel("Algorithms", fontsize=14)
+plt.ylabel("Accuracy (%)", fontsize=14)
+plt.title("Accuracy of Different Algorithms", fontsize=16)
+plt.xticks(rotation=45, ha="right")
+plt.ylim(0, 1)
+
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+
+plt.tight_layout()
+plt.show()
+
+[CODE CELL]
+
+
+[MARKDOWN CELL]
+## save the model
+
+[CODE CELL]
+import pickle
+
+
+with open('Flight-Fare-Prediction.pkl', 'wb') as file:
+    pickle.dump(rfr_random, file)
+
+try:
+    with open('Flight-Fare-Prediction.pkl', 'rb') as model_file:
+        mod = pickle.load(model_file)
+    print("Model loaded successfully!")
+except EOFError:
+    print("Error: The file is empty or corrupted.")
+except FileNotFoundError:
+    print("Error: The file does not exist. Please save the model first.")
+
+
+[CODE CELL]
+metrics.r2_score(y_test,prediction)
+
+[CODE CELL]
+
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+algorithms = [
+    "Logistic Regression","Ridge","Lasso", "Decision Tree",
+    "Random Forest", "SVR"
+
+]
+accuracies = [0.65, 0.65, 0.65, 0.74, 0.84, 0.00]
+
+
+colors = [
+    'blue', 'green', 'orange', 'purple',
+    'red', 'cyan', 'magenta', 'lime',
+    'yellow'
+]
+
+plt.figure(figsize=(14, 7))
+bars = plt.bar(algorithms, accuracies, color=colors, edgecolor='black')
+
+
+for bar, acc in zip(bars, accuracies):
+    plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{acc*100:.1f}%",
+             ha='center', va='bottom', fontsize=10, color='black')
+
+plt.xlabel("Algorithms", fontsize=14)
+plt.ylabel("Accuracy (%)", fontsize=14)
+plt.title("Accuracy of Different Algorithms", fontsize=16)
+plt.xticks(rotation=45, ha="right")
+plt.ylim(0, 1)
+
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+
+plt.tight_layout()
+plt.show()
+
+[CODE CELL]
+
