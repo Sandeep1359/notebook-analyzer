@@ -1,0 +1,259 @@
+[CODE CELL]
+#importing dependencies
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+[MARKDOWN CELL]
+### Importing The Data
+
+[CODE CELL]
+data = pd.read_csv("C:\\Users\\DELL\\Downloads\\salary\\salary.csv",low_memory=False)
+
+[MARKDOWN CELL]
+### Loading The Data
+
+[CODE CELL]
+data.head()
+
+[CODE CELL]
+data.describe()
+
+[CODE CELL]
+data.isnull().sum()
+
+[CODE CELL]
+data.info()
+
+[MARKDOWN CELL]
+### EDA
+
+[CODE CELL]
+irrelevant_columns = [
+    'LAST NAME', 'FIRST NAME', 'MI', 'duplicated', 'multiple_full_time_jobs',
+    'combined_multiple_jobs', 'summed_annual_salary', 'hide_from_search']
+
+[CODE CELL]
+data_cleaned = data.drop(columns=irrelevant_columns)
+
+
+[CODE CELL]
+data_cleaned = data_cleaned.dropna(subset=['ANNUAL'])
+
+
+[CODE CELL]
+data_cleaned = data_cleaned.dropna()
+
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+[CODE CELL]
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Ensure only numerical columns are included for the correlation heatmap
+numerical_columns = data_cleaned.select_dtypes(include=['number']).columns
+
+# Compute correlations
+correlation_matrix = data_cleaned[numerical_columns].corr()
+
+# Plot the heatmap
+plt.figure(figsize=(8, 12))
+sns.heatmap(correlation_matrix, annot=True, cmap="inferno")
+plt.title("Correlation Heatmap of Numerical Features")
+plt.show()
+
+
+[MARKDOWN CELL]
+### Defining features and Target
+
+[CODE CELL]
+features = [
+    'AGENCY', 'AGENCY NAME', 'CLASS CODE', 'CLASS TITLE', 'ETHNICITY',
+    'GENDER', 'STATUS', 'HRLY RATE', 'HRS PER WK', 'STATE NUMBER'
+]
+
+[CODE CELL]
+target = 'ANNUAL'
+
+[CODE CELL]
+X = data_cleaned[features]
+y = data_cleaned[target]
+
+[MARKDOWN CELL]
+### OneHotEncoding for categorical, Scaling for numerical
+
+[CODE CELL]
+categorical_cols = ['AGENCY NAME', 'CLASS CODE', 'CLASS TITLE', 'ETHNICITY', 'GENDER', 'STATUS']
+
+[CODE CELL]
+numerical_cols = ['HRLY RATE', 'HRS PER WK', 'STATE NUMBER']
+
+
+[CODE CELL]
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), numerical_cols),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_cols)
+    ]
+)
+
+[MARKDOWN CELL]
+### Splittig X and y
+
+[CODE CELL]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2 , random_state = 42)
+
+[CODE CELL]
+X_train_preprocessed = preprocessor.fit_transform(X_train)
+X_test_preprocessed = preprocessor.transform(X_test)
+
+[MARKDOWN CELL]
+### Model Training
+
+[CODE CELL]
+model = LinearRegression()
+model.fit(X_train_preprocessed, y_train)
+
+
+[CODE CELL]
+y_pred_train = model.predict(X_train_preprocessed)
+y_pred_test = model.predict(X_test_preprocessed)
+
+
+[CODE CELL]
+mae_train = mean_absolute_error(y_train, y_pred_train)
+mae_test = mean_absolute_error(y_test, y_pred_test)
+rmse_train = mean_squared_error(y_train, y_pred_train, squared=False)
+rmse_test = mean_squared_error(y_test, y_pred_test, squared=False)
+r2_train = r2_score(y_train, y_pred_train)
+r2_test = r2_score(y_test, y_pred_test)
+
+
+[MARKDOWN CELL]
+### Evaluation Metrics
+
+[CODE CELL]
+print("Training Set Evaluation:")
+print(f"MAE: {mae_train}, RMSE: {rmse_train}, R^2: {r2_train}")
+
+
+[CODE CELL]
+print("\nTest Set Evaluation:")
+print(f"MAE: {mae_test}, RMSE: {rmse_test}, R^2: {r2_test}")
+
+[MARKDOWN CELL]
+### Outliers
+
+[CODE CELL]
+# Step: Detect outliers in salaries
+Q1 = data_cleaned['ANNUAL'].quantile(0.25)  # First quartile
+Q3 = data_cleaned['ANNUAL'].quantile(0.75)  # Third quartile
+IQR = Q3 - Q1  # Interquartile range
+
+# Define outlier bounds
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+
+# Filter outliers
+outliers = data_cleaned[(data_cleaned['ANNUAL'] < lower_bound) | (data_cleaned['ANNUAL'] > upper_bound)]
+
+print(f"Number of outliers: {outliers.shape[0]}")
+print("Outliers:\n", outliers[['AGENCY NAME', 'CLASS TITLE', 'ANNUAL']])
+
+
+[MARKDOWN CELL]
+### Biggest wage disparities between mangers and employees
+
+[CODE CELL]
+# Define job roles indicating managerial positions
+manager_keywords = ['Manager', 'Director', 'Supervisor', 'Chief', 'Head', 'Lead']
+
+# Add a column identifying managerial positions
+data_cleaned['IS_MANAGER'] = data_cleaned['CLASS TITLE'].str.contains('|'.join(manager_keywords), case=False, na=False)
+
+# Group by agency and role, and calculate average salary for managers and employees
+grouped = data_cleaned.groupby(['AGENCY NAME', 'CLASS TITLE', 'IS_MANAGER'])['ANNUAL'].mean().reset_index()
+
+# Pivot to create separate columns for manager and employee salaries
+salary_disparity = grouped.pivot_table(
+    index=['AGENCY NAME', 'CLASS TITLE'],
+    columns='IS_MANAGER',
+    values='ANNUAL',
+    aggfunc='mean'
+).reset_index()
+
+# Rename columns for clarity
+salary_disparity.columns = ['AGENCY NAME', 'CLASS TITLE', 'EMPLOYEE_SALARY', 'MANAGER_SALARY']
+
+# Calculate the disparity as the absolute difference and ratio
+salary_disparity['DIFFERENCE'] = salary_disparity['MANAGER_SALARY'] - salary_disparity['EMPLOYEE_SALARY']
+salary_disparity['RATIO'] = salary_disparity['MANAGER_SALARY'] / salary_disparity['EMPLOYEE_SALARY']
+
+# Sort by the largest disparities
+largest_disparities = salary_disparity.sort_values(by='DIFFERENCE', ascending=False).head(10)
+
+# Output the results
+print("Top 10 Departments/Roles with Largest Wage Disparities:")
+print(largest_disparities)
+
+
+[MARKDOWN CELL]
+### Salries and total compensations
+
+[CODE CELL]
+import matplotlib.pyplot as plt
+
+# Ensure the dataset has a time-based column, e.g., 'YEAR' or 'DATE'
+if 'YEAR' in data_cleaned.columns:
+    # Group by year, agency, and role, and calculate average salaries and compensations
+    trends = data_cleaned.groupby(['YEAR', 'AGENCY NAME', 'CLASS TITLE']).agg(
+        average_salary=('ANNUAL', 'mean'),
+        average_hrly_rate=('HRLY RATE', 'mean'),
+        head_count=('ANNUAL', 'count')  # Assuming each row is an employee
+    ).reset_index()
+
+    # Example: Analyze trends for a specific agency or role
+    agency_to_plot = 'TEXAS DEPARTMENT OF CRIMINAL JUSTICE'
+    role_to_plot = 'CORREC OFFICER IV'
+
+    filtered_trends = trends[
+        (trends['AGENCY NAME'] == agency_to_plot) &
+        (trends['CLASS TITLE'] == role_to_plot)
+    ]
+
+    # Plot trends
+    plt.figure(figsize=(10, 6))
+    plt.plot(filtered_trends['YEAR'], filtered_trends['average_salary'], label='Average Salary')
+    plt.plot(filtered_trends['YEAR'], filtered_trends['average_hrly_rate'], label='Average Hourly Rate')
+    plt.bar(filtered_trends['YEAR'], filtered_trends['head_count'], alpha=0.3, label='Head Count', color='gray')
+    plt.title(f"Trends Over Time for {role_to_plot} in {agency_to_plot}")
+    plt.xlabel("Year")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.show()
+
+else:
+    print("The dataset does not include a time-based column (e.g., 'YEAR').")
+
+
+[MARKDOWN CELL]
+### Challenges faced
+
+[MARKDOWN CELL]
+There are many challenges we faced some of them are like a particular model takes so much time to give output even it takes hours sometimes ,
+and also in handling missing values like which we have to drop or eliminate to achieve good model score and many errors
+
+[MARKDOWN CELL]
+### Model comaprison report
+
+[MARKDOWN CELL]
+ Here in this project we used linear regression algorithm and tested it, we got good accuaracy in evaluation metrics like we got 95% accuracy on training data and 93% accuaracy on test data
+
+[CODE CELL]
+
